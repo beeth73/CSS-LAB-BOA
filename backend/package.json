@@ -1,7 +1,7 @@
 {
   "name": "css-lab-boa-backend",
   "version": "0.1.0",
-  "description": "Session orchestration + pty bridge for CSS-LAB-BOA",
+  "description": "Session orchestration + terminal bridge for CSS-LAB-BOA",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
@@ -13,7 +13,6 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "js-yaml": "^4.1.0",
-    "node-pty": "^1.0.0",
     "ws": "^8.17.0"
   }
 }

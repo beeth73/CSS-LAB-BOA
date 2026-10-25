@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>CSS-LAB-BOA — terminal bridge test</title>
+<link rel="stylesheet" href="xterm.css">
+<style>body{margin:0;background:#0e1410;color:#e8efe9;font-family:monospace;} #term{padding:1rem;} #status{padding:1rem;}</style>
+</head><body>
+<div id="status">Loading...</div>
+<div id="term"></div>
+<script src="xterm.js"></script>
+<script>
+  if (typeof Terminal === 'undefined') {
+    document.getElementById('status').textContent = 'ERROR: Terminal is still undefined after loading local xterm.js';
+  } else {
+    const term = new Terminal({ cursorBlink: true, fontSize: 14 });
+    term.open(document.getElementById('term'));
+    term.writeln('Connecting to sandbox...');
+
+    const ws = new WebSocket('ws://localhost:4000/session');
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+      document.getElementById('status').textContent = 'WebSocket connected';
+      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    };
+    ws.onerror = (e) => {
+      document.getElementById('status').textContent = 'WebSocket ERROR — is the backend running on :4000?';
+      console.error('WebSocket error:', e);
+    };
+    ws.onmessage = (ev) => term.write(new Uint8Array(ev.data));
+    ws.onclose = () => term.writeln('\r\n[session closed]');
+    term.onData((data) => ws.send(data));
+  }
+</script>
+</body></html>

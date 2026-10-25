@@ -167,3 +167,15 @@ For each of the 7 levels, verify:
 - [ ] Phase 7 not started
 
 **Next action:** draft `docs/procedure.md`, then begin Phase 2 with `levels/01-gets`.
+
+**Update:** Phase 3's core loop is now proven end-to-end — a browser
+(xterm.js test client, `backend/test-client/`) connects over websocket to
+the Node backend, which spawns a locked-down session container and opens
+a live `docker exec` shell into it (no `node-pty` needed; Docker's own
+`Tty: true` exec gives a real hijacked duplex stream). Verified by running
+level 01's vulnerable/secure pair through that live connection and
+confirming the same ASan output seen in manual testing.
+
+**Next action:** batch out levels 02–07 using the 01-gets pattern, now
+that the full pipeline (browser → backend → sandbox) is confirmed working
+rather than assumed.
