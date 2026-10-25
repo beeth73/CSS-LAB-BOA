@@ -1,0 +1,9 @@
+version: "3.9"
+
+services:
+  sandbox-image:
+    build:
+      context: .
+      dockerfile: docker/sandbox.Dockerfile
+    image: css-lab-boa-sandbox
+    command: ["true"]   # this service only exists to build/tag the image

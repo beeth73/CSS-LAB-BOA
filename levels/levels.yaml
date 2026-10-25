@@ -1,0 +1,94 @@
+levels:
+  - id: "01-gets"
+    order: 1
+    title: "gets() — Unbounded Stdin Read"
+    function: "gets"
+    buffer_size: 16
+    compile_flags_vuln: "-g -fsanitize=address -fno-stack-protector"
+    compile_flags_secure: "-g -O0"
+    win_condition:
+      type: "crash_or_asan"
+      description: "Supply input longer than the buffer to trigger a stack-buffer-overflow report."
+    hints:
+      - "How many bytes does the buffer actually hold? Check the source."
+      - "gets() stops only at a newline, never at the buffer boundary."
+
+  - id: "02-strcpy"
+    order: 2
+    title: "strcpy() — Unchecked Copy"
+    function: "strcpy"
+    buffer_size: 16
+    compile_flags_vuln: "-g -fsanitize=address -fno-stack-protector"
+    compile_flags_secure: "-g -O0"
+    win_condition:
+      type: "crash_or_asan"
+      description: "Supply a source string longer than the destination buffer."
+    hints:
+      - "strcpy copies until a null byte, not until the destination ends."
+
+  - id: "03-strcat"
+    order: 3
+    title: "strcat() — Unchecked Concatenation"
+    function: "strcat"
+    buffer_size: 20
+    compile_flags_vuln: "-g -fsanitize=address -fno-stack-protector"
+    compile_flags_secure: "-g -O0"
+    win_condition:
+      type: "crash_or_asan"
+      description: "Concatenate past the destination's remaining capacity."
+    hints:
+      - "strcat appends starting at the existing string's null terminator."
+
+  - id: "04-sprintf"
+    order: 4
+    title: "sprintf() — Oversized Formatted Output"
+    function: "sprintf"
+    buffer_size: 32
+    compile_flags_vuln: "-g -fsanitize=address -fno-stack-protector"
+    compile_flags_secure: "-g -O0"
+    win_condition:
+      type: "crash_or_asan"
+      description: "Craft a format argument whose rendered output exceeds the buffer."
+    hints:
+      - "A long %s argument is the simplest overflow vector here."
+
+  - id: "05-memcpy"
+    order: 5
+    title: "memcpy() — Incorrect Byte Count"
+    function: "memcpy"
+    buffer_size: 16
+    compile_flags_vuln: "-g -fsanitize=address -fno-stack-protector"
+    compile_flags_secure: "-g -O0"
+    win_condition:
+      type: "flag_flip"
+      description: "Overflow into the adjacent access_granted variable to flip it nonzero."
+    hints:
+      - "Look at the variable declared immediately after the buffer in memory."
+
+  - id: "06-array-indexing"
+    order: 6
+    title: "Array Indexing — Invalid Index"
+    function: "array_index"
+    buffer_size: 10
+    compile_flags_vuln: "-g -fsanitize=address"
+    compile_flags_secure: "-g -O0"
+    win_condition:
+      type: "asan_report"
+      description: "Provide an out-of-bounds index and capture the ASan report."
+    hints:
+      - "Try a negative index too, not just one that's too large."
+
+  - id: "07-bonus-redirect"
+    order: 7
+    bonus: true
+    title: "Bonus — Return Address Overwrite"
+    function: "strcpy_redirect"
+    buffer_size: 16
+    compile_flags_vuln: "-g -fno-stack-protector -fno-pie -no-pie -z execstack"
+    compile_flags_secure: "-g -O0"
+    win_condition:
+      type: "control_flow_redirect"
+      description: "Overwrite the saved return address to jump into secret_win()."
+    hints:
+      - "Find the offset from the buffer's start to the saved return address."
+      - "secret_win() is compiled in but never called — find where it lives."

@@ -6,3 +6,9 @@ build/
 .DS_Store
 levels/**/*.out
 levels/**/*.o
+
+# Python / scripts venv
+scripts/.venv/
+scripts/__pycache__/
+.pytest_cache/
+*.pyc

@@ -1,0 +1,16 @@
+# Normal input ("Bhushan") — vuln.c and secure.c behave identically
+Enter your name: Hello, Bhushan!
+Returned safely.
+
+# Oversized input (40 'A' characters) — vuln.c
+Enter your name:
+=================================================================
+==PID==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x...
+WRITE of size 41 at 0x... thread T0
+    #0 ... in vulnerable_read levels/01-gets/vuln.c:7
+SUMMARY: AddressSanitizer: stack-buffer-overflow levels/01-gets/vuln.c:7 in vulnerable_read
+==PID==ABORTING
+
+# Same oversized input — secure.c (truncated at 15 chars + null terminator, no crash)
+Enter your name: Hello, AAAAAAAAAAAAAAA!
+Returned safely.
