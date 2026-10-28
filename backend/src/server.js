@@ -10,6 +10,8 @@ import {
   resizeShell,
   destroySession,
 } from "./sessionManager.js";
+import crypto from "crypto";
+import { makeFlagMinter } from "./flagEngine.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 4000;
@@ -60,7 +62,15 @@ wss.on("connection", async (ws) => {
   activeSessions.set(ws, { container, idleTimer: null });
   resetIdleTimer(ws);
 
-  stream.on("data", (chunk) => { if (ws.readyState === ws.OPEN) ws.send(chunk); });
+  const sessionId = crypto.randomUUID();
+  const flagMinter = makeFlagMinter();
+  let currentLevelId = null;
+
+  stream.on("data", (chunk) => {
+    if (ws.readyState === ws.OPEN) ws.send(chunk);
+    const win = flagMinter.feed(chunk, sessionId, currentLevelId);
+    if (win) ws.send(JSON.stringify({ type: "flag", ...win }));
+  });
   stream.on("end", () => ws.close());
 
   ws.on("message", (data, isBinary) => {
@@ -71,6 +81,7 @@ wss.on("connection", async (ws) => {
       try {
         const msg = JSON.parse(data.toString());
         if (msg.type === "resize") { resizeShell(exec, msg.cols, msg.rows); return; }
+        if (msg.type === "setLevel") { currentLevelId = msg.levelId; return; }
       } catch (_) {}
     }
     stream.write(data);
@@ -105,22 +116,3 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 app.use("/docs", express.static(path.join(__dirname, "../../docs")));
-
-
-import crypto from "crypto";
-import { makeFlagMinter } from "./flagEngine.js";
-
-// inside wss.on("connection", async (ws) => { ... }) :
-const sessionId = crypto.randomUUID();
-const flagMinter = makeFlagMinter();
-let currentLevelId = null;
-
-// in stream.on("data", ...):
-stream.on("data", (chunk) => {
-  if (ws.readyState === ws.OPEN) ws.send(chunk);
-  const win = flagMinter.feed(chunk, sessionId, currentLevelId);
-  if (win) ws.send(JSON.stringify({ type: "flag", ...win }));
-});
-
-// in ws.on("message", ...), alongside the existing resize branch:
-if (msg.type === "setLevel") { currentLevelId = msg.levelId; return; }

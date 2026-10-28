@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CSS-LAB-BOA — Buffer Overflow Lab</title>
+<link rel="stylesheet" href="/vendor/xterm.css">
+<style>
+  :root{
+    --bg:#0e1410;--bg-raised:#141c17;--ink:#e8efe9;--ink-dim:#9fb3a6;--rule:#28352d;
+    --accent:#7fe0a0;--vuln:#e07a7a;--secure:#7fe0a0;
+    --mono:"SFMono-Regular","JetBrains Mono",Consolas,Menlo,monospace;
+    --serif:"Iowan Old Style","Georgia","Charter",serif;
+    color-scheme:dark; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);line-height:1.55;}
+  nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:rgba(14,20,16,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);overflow-x:auto;}
+  .navrow{display:flex;gap:1.2rem;padding:.8rem 1.2rem;font-family:var(--mono);font-size:.76rem;white-space:nowrap;}
+  .navrow a{color:var(--ink-dim);text-decoration:none;} .navrow a:hover{color:var(--accent);}
+  .wrap{max-width:780px;margin:0 auto;padding:3rem 1.4rem 5rem;}
+  h1{font-size:clamp(1.7rem,5vw,2.3rem);margin:0 0 .8rem;font-weight:600;letter-spacing:-.01em;max-width:22ch;}
+  .kicker{font-family:var(--mono);font-size:.76rem;color:var(--ink-dim);margin:0 0 .7rem;}
+  .tagline{color:var(--ink-dim);max-width:52ch;margin:0;}
+  section{margin:3rem 0;scroll-margin-top:3.4rem;}
+  h2{font-family:var(--mono);font-size:.82rem;color:var(--accent);margin:0 0 1rem;font-weight:600;}
+  p{max-width:68ch;} .lede{color:var(--ink-dim);}
+  .fn{color:var(--vuln);font-family:var(--mono);font-size:.95em;} .fn.safe{color:var(--secure);}
+
+  #termwrap{background:#000;border:1px solid var(--rule);border-radius:8px;overflow:hidden;}
+  #termbar{display:flex;justify-content:space-between;align-items:center;padding:.5rem .8rem;background:var(--bg-raised);border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:.72rem;color:var(--ink-dim);}
+  #status{display:flex;align-items:center;gap:.4rem;}
+  #dot{width:7px;height:7px;border-radius:50%;background:#d9b15a;}
+  #dot.live{background:var(--secure);} #dot.dead{background:var(--vuln);}
+  #term{height:380px;padding:.5rem;}
+
+  details.level{background:var(--bg-raised);border:1px solid var(--rule);border-radius:8px;margin-bottom:.7rem;}
+  details.level summary{list-style:none;cursor:pointer;padding:.9rem 1.1rem;display:flex;gap:.7rem;align-items:baseline;}
+  details.level summary::-webkit-details-marker{display:none;}
+  .num{font-family:var(--mono);font-size:.72rem;color:var(--ink-dim);}
+  .level .body{padding:0 1.1rem 1rem;border-top:1px solid var(--rule);padding-top:.8rem;font-size:.92rem;}
+  .snippet{background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:.6rem .8rem;font-family:var(--mono);font-size:.76rem;overflow-x:auto;margin:.5rem 0;}
+
+  .faq{border-bottom:1px solid var(--rule);padding:.9rem 0;}
+  .faq summary{cursor:pointer;list-style:none;font-weight:600;font-size:.94rem;}
+  .faq summary::-webkit-details-marker{display:none;}
+  .faq p{margin:.6rem 0 0;color:var(--ink-dim);font-size:.9rem;}
+
+  .links{display:grid;gap:.5rem;}
+  .links a{display:block;padding:.7rem .85rem;background:var(--bg-raised);border:1px solid var(--rule);border-radius:6px;color:var(--ink);text-decoration:none;font-size:.9rem;}
+  footer{margin-top:3.5rem;padding-top:1.3rem;border-top:1px solid var(--rule);font-family:var(--mono);font-size:.76rem;color:var(--ink-dim);}
+  a{color:var(--accent);}
+
+  #vizwrap{background:var(--bg-raised);border:1px solid var(--rule);border-radius:8px;padding:1rem;}
+  #vizbar{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:.74rem;color:var(--ink-dim);margin-bottom:.8rem;flex-wrap:wrap;gap:.5rem;}
+  .legend{display:flex;gap:.9rem;align-items:center;}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:.3rem;vertical-align:middle;}
+  .sw.buf{background:#5aa7e0;} .sw.adj{background:var(--vuln);} .sw.rest{background:#2a332d;}
+  #vizgrid{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;margin-bottom:1rem;}
+  .cell{aspect-ratio:1;border-radius:3px;background:#1b241e;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.6rem;color:var(--ink-dim);transition:background .15s,transform .15s;}
+  .cell.buf{background:#1d3a52;} .cell.adj{background:#4a2020;}
+  .cell.hit{transform:scale(1.15);}
+  .cell.overflow{background:var(--vuln);color:#1a0a0a;font-weight:700;}
+  #vizcontrols{display:flex;gap:.5rem;flex-wrap:wrap;}
+  #vizinput{flex:1;min-width:200px;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:.5rem .7rem;color:var(--ink);font-family:var(--mono);font-size:.85rem;}
+  #vizcontrols button{background:var(--accent);color:#0a1410;border:none;border-radius:6px;padding:.5rem 1rem;font-family:var(--mono);font-size:.8rem;font-weight:700;cursor:pointer;}
+  #vizcontrols button#vizreset{background:transparent;color:var(--ink-dim);border:1px solid var(--rule);}
+
+  .qcard{background:var(--bg-raised);border:1px solid var(--rule);border-radius:8px;padding:1rem 1.1rem;margin-bottom:.8rem;}
+  .qcard p.qtext{font-weight:600;margin:0 0 .7rem;font-size:.95rem;}
+  .qopt{display:block;width:100%;text-align:left;background:var(--bg);border:1px solid var(--rule);border-radius:6px;padding:.55rem .8rem;margin-bottom:.4rem;color:var(--ink);font-size:.88rem;cursor:pointer;font-family:var(--serif);}
+  .qopt:hover{border-color:var(--accent);}
+  .qopt.correct{border-color:var(--secure);background:#132a1c;}
+  .qopt.wrong{border-color:var(--vuln);background:#2a1414;}
+  #quizscore{font-family:var(--mono);font-size:.9rem;color:var(--accent);margin-top:1rem;}
+</style>
+</head>
+<body>
+
+<nav><div class="navrow">
+  <a href="#run">Run a level</a><a href="#theory">Theory</a><a href="#levels">Levels</a><a href="#faq">FAQ</a><a href="#visualizer">Visualizer</a><a href="#quiz">Quiz</a><a href="#links">Links</a>
+</div></nav>
+
+<div class="wrap">
+  <p class="kicker">CSS-LAB-BOA <span style="opacity:.6">/ buffer overflow lab</span></p>
+  <h1>Break it, read why, see the fix.</h1>
+  <p class="tagline">A live, isolated sandbox for six classic C memory-safety bugs. Pick a level below, type the commands into the terminal, watch it fail — then compare it against the fixed version.</p>
+
+  <section id="run">
+    <h2>live terminal</h2>
+    <div id="termwrap">
+      <div id="termbar"><span id="status"><span id="dot"></span><span id="statustext">connecting…</span></span><span>bash · /opt/levels</span></div>
+      <div id="term"></div>
+    </div>
+    <p class="lede" style="font-size:.85rem;margin-top:.6rem;">Each page load starts a fresh, disposable sandbox session. Closing the tab ends it — nothing persists.</p>
+  </section>
+
+  <section id="theory">
+    <h2>the idea in one minute</h2>
+    <p class="lede">A buffer is a fixed-size chunk of memory. C does not stop you writing past its end — the extra bytes spill into whatever sits next in memory, including, on the stack, the address execution returns to when the function ends. Every level below is the same shape: an unsafe call, an input that proves it, a safe rewrite beside it.</p>
+  </section>
+
+  <section id="levels">
+    <h2>the levels</h2>
+
+    <details class="level" open data-level="01-gets"><summary><span class="num">01</span><b><span class="fn">gets()</span> — unbounded read</b></summary>
+      <div class="body"><p>No length argument exists for it to respect — removed from the C standard for exactly this reason.</p>
+        <div class="snippet">cd 01-gets && gcc -g -fsanitize=address -fno-stack-protector -o /tmp/v vuln.c
+echo "Bhushan" | /tmp/v
+python3 -c "print('A'*40)" | /tmp/v</div>
+        <p>Fix: <code class="fn safe">fgets(buffer, sizeof(buffer), stdin)</code>.</p>
+        <p><a class="docslink" href="/docs/01-gets.html" target="_blank" rel="noopener">Full technical write-up →</a></p>
+      <div class="flagslot" hidden></div></div>
+    </details>
+
+    <details class="level" data-level="02-strcpy"><summary><span class="num">02</span><b><span class="fn">strcpy()</span> — unchecked copy</b></summary>
+      <div class="body"><p>Copies until a null byte, blind to the destination's size.</p>
+        <div class="snippet">cd 02-strcpy && gcc -g -fsanitize=address -fno-stack-protector -o /tmp/v vuln.c
+/tmp/v "Bhushan"
+/tmp/v "$(python3 -c "print('A'*40)")"</div>
+    <p>Fix: <code class="fn safe">strncpy(dest, src, sizeof(dest)-1)</code>.</p>
+    <p><a class="docslink" href="/docs/02-strcpy.html" target="_blank" rel="noopener">Full technical write-up →</a></p>
+    <div class="flagslot" hidden></div></div>
+</details>
+
+<details class="level" data-level="03-strcat"><summary><span class="num">03</span><b><span class="fn">strcat()</span> — unchecked concatenation</b></summary>
+  <div class="body"><p>Appends with no sense of remaining capacity.</p>
+    <div class="snippet">cd 03-strcat && gcc -g -fsanitize=address -fno-stack-protector -o /tmp/v vuln.c
+/tmp/v "$(python3 -c "print('A'*40)")"</div>
+    <p>Fix: <code class="fn safe">strncat(dest, src, remaining)</code>.</p>
+    <p><a class="docslink" href="/docs/03-strcat.html" target="_blank" rel="noopener">Full technical write-up →</a></p>
+    <div class="flagslot" hidden></div></div>
+</details>
+
+<details class="level" data-level="04-sprintf"><summary><span class="num">04</span><b><span class="fn">sprintf()</span> — oversized output</b></summary>
+  <div class="body"><p>No limit on the formatted result's length.</p>
+    <div class="snippet">cd 04-sprintf && gcc -g -fsanitize=address -fno-stack-protector -o /tmp/v vuln.c
+/tmp/v "$(python3 -c "print('A'*40)")"</div>
+    <p>Fix: <code class="fn safe">snprintf(buf, sizeof(buf), …)</code>.</p>
+    <p><a class="docslink" href="/docs/04-sprintf.html" target="_blank" rel="noopener">Full technical write-up →</a></p>
+    <div class="flagslot" hidden></div></div>
+</details>
+
+<details class="level" data-level="05-memcpy"><summary><span class="num">05</span><b><span class="fn">memcpy()</span> — incorrect byte count</b></summary>
+  <div class="body"><p>Copies exactly as told — correctly. The bug is trusting an unvalidated length.</p>
+    <div class="snippet">cd 05-memcpy && gcc -g -fsanitize=address -fno-stack-protector -o /tmp/v vuln.c
+/tmp/v "$(python3 -c "print('A'*40)")"</div>
+    <p>Win condition: craft an input that flips the adjacent <code>access_granted</code> variable. Fix: clamp the length to <code>sizeof(buffer)-1</code>.</p>
+    <p><a class="docslink" href="/docs/05-memcpy.html" target="_blank" rel="noopener">Full technical write-up →</a></p>
+    <div class="flagslot" hidden></div></div>
+</details>
+
+<details class="level" data-level="06-array-indexing"><summary><span class="num">06</span><b>array indexing — invalid index</b></summary>
+  <div class="body"><p>No bound on the index itself, positive or negative.</p>
+    <div class="snippet">cd 06-array-indexing && gcc -g -fsanitize=address -o /tmp/v vuln.c
+/tmp/v 15 1      # out of bounds
+/tmp/v -5 1      # negative index</div>
+    <p>Fix: validate <code>0 ≤ idx &lt; 10</code> before every access.</p>
+    <p><a class="docslink" href="/docs/06-array-indexing.html" target="_blank" rel="noopener">Full technical write-up →</a></p>
+    <div class="flagslot" hidden></div></div>
+</details>
+
+<details class="level" data-level="07-bonus-redirect"><summary><span class="num">07</span><b>return-address overwrite <span style="color:#d9b15a;font-family:var(--mono);font-size:.7rem;border:1px solid #d9b15a44;padding:.1rem .45rem;border-radius:4px;margin-left:.5rem;">bonus</span></b></summary>
+  <div class="body"><p>The deepest level: overwrite the saved return address to redirect execution into a function never called by the program. Canaries, PIE and ASLR are deliberately off here to make the raw mechanism visible.</p>
+    <div class="snippet">cd 07-bonus-redirect && gcc -g -fno-stack-protector -fno-pie -no-pie -z execstack -o /tmp/v vuln.c
+/tmp/v "$(python3 -c "print('A'*40)")"</div>
+    <p>Fix: use a bounds-aware copy and keep the return address out of reach.</p>
+    <p><a class="docslink" href="/docs/07-bonus-redirect.html" target="_blank" rel="noopener">Full technical write-up →</a></p>
+    <div class="flagslot" hidden></div></div>
+</details>
+  </section>
+
+
+  <section id="visualizer">
+    <h2>stack visualizer</h2>
+    <p class="lede">A real WebAssembly module backs this — not a JS simulation. <code>write_byte</code> is an unchecked store with no bounds check, exactly like the C functions above. Type a payload and watch it march across a simulated 16-byte buffer into the 8 bytes right after it.</p>
+    <div id="vizwrap">
+      <div id="vizbar">
+        <span id="vizstatus">loading wasm…</span>
+        <span class="legend"><span class="sw buf"></span>buffer[16]<span class="sw adj"></span>adjacent[8]<span class="sw rest"></span>unused</span>
+      </div>
+      <div id="vizgrid"></div>
+      <div id="vizcontrols">
+        <input id="vizinput" type="text" placeholder="type a payload, e.g. AAAAAAAAAAAAAAAABBBB" maxlength="40">
+        <button id="vizwrite">Write</button>
+        <button id="vizreset">Reset</button>
+      </div>
+      <p id="vizmsg" class="lede" style="font-size:.85rem;"></p>
+    </div>
+  </section>
+
+  <section id="quiz">
+    <h2>quick check</h2>
+    <p class="lede">Six questions, drawn from the viva material. Scored instantly, nothing sent anywhere.</p>
+    <div id="quizwrap"></div>
+  </section>
+
+  <section id="faq">
+    <h2>faq</h2>
+    <details class="faq"><summary>Is this actually safe to run?</summary><p>Yes — each session is a disposable, network-isolated Docker container with a read-only filesystem outside a small scratch area and hard resource limits. Never run these binaries outside the sandbox.</p></details>
+    <details class="faq"><summary>What is AddressSanitizer?</summary><p>A compiler instrumentation that surrounds allocations with poisoned "redzones," catching out-of-bounds access the instant it happens, with the exact address and stack trace.</p></details>
+    <details class="faq"><summary>I got "Read-only file system" compiling.</summary><p>Compile into <code>/tmp</code>, the writable scratch area, not the level directory itself.</p></details>
+    <details class="faq"><summary>What's different between vuln.c and secure.c?</summary><p>Only the one function under study, swapped for its bounds-aware counterpart. Same input, different outcome.</p></details>
+  </section>
+
+  <section id="links">
+    <h2>references</h2>
+    <div class="links">
+      <a href="https://github.com/beeth73/CSS-LAB-BOA">Project repository</a>
+      <a href="https://cwe.mitre.org/data/definitions/120.html">CWE-120 — Buffer Copy without Checking Size of Input</a>
+      <a href="https://clang.llvm.org/docs/AddressSanitizer.html">AddressSanitizer documentation</a>
+      <a href="https://owasp.org/www-community/vulnerabilities/Buffer_Overflow">OWASP — Buffer Overflow</a>
+    </div>
+  </section>
+
+  <footer>MIT licensed · educational use only · Bhushan Ladgaonkar · TE Computer Engineering, Div A · FrCRCE</footer>
+</div>
+
+<script src="/vendor/xterm.js"></script>
+<script>
+  const term = new Terminal({ cursorBlink: true, fontSize: 13, theme: { background: "#000000" } });
+  term.open(document.getElementById('term'));
+  const dot = document.getElementById('dot');
+  const statustext = document.getElementById('statustext');
+
+  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/session');
+  ws.binaryType = 'arraybuffer';
+  function showFlag(levelId, flag) {
+  const d = document.querySelector(`details.level[data-level="${levelId}"]`);
+  if (!d) return;
+  d.classList.add('solved');
+  const slot = d.querySelector('.flagslot');
+  if (slot) { slot.hidden = false; slot.textContent = `Flag captured: ${flag}`; }
+}
+
+document.querySelectorAll('details.level').forEach((d) => {
+  d.addEventListener('toggle', () => {
+    if (d.open) ws.send(JSON.stringify({ type: 'setLevel', levelId: d.dataset.level }));
+  });
+});
+
+ws.onopen = () => {
+  dot.className = 'live'; statustext.textContent = 'connected';
+  ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+  const openLevel = document.querySelector('details.level[open]');
+  if (openLevel) ws.send(JSON.stringify({ type: 'setLevel', levelId: openLevel.dataset.level }));
+  };
+  ws.onerror = () => { dot.className = 'dead'; statustext.textContent = 'connection error'; };
+  ws.onclose = () => { dot.className = 'dead'; statustext.textContent = 'disconnected'; term.writeln('\r\n[session closed]'); };
+  ws.onmessage = (ev) => {
+  if (typeof ev.data === 'string') {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'flag') showFlag(msg.levelId, msg.flag);
+    } catch (_) {}
+    return;
+  }
+  term.write(new Uint8Array(ev.data));
+};
+term.onData((data) => ws.send(data));
+</script>
+
+<script>
+// ---- Stack visualizer, backed by a real compiled WASM module ----
+(async () => {
+  const statusEl = document.getElementById('vizstatus');
+  const gridEl = document.getElementById('vizgrid');
+  const msgEl = document.getElementById('vizmsg');
+  const BUF_SIZE = 16, ADJ_SIZE = 8, TOTAL = BUF_SIZE + ADJ_SIZE;
+
+  for (let i = 0; i < TOTAL; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell ' + (i < BUF_SIZE ? 'buf' : 'adj');
+    c.id = 'cell' + i;
+    gridEl.appendChild(c);
+  }
+
+  let wasm;
+  try {
+    const resp = await fetch('/vendor/overflow.wasm');
+    const bytes = await resp.arrayBuffer();
+    const { instance } = await WebAssembly.instantiate(bytes);
+    wasm = instance.exports;
+    wasm.reset_region();
+    statusEl.textContent = 'wasm module loaded — ' + bytes.byteLength + ' bytes';
+  } catch (e) {
+    statusEl.textContent = 'failed to load wasm module';
+    console.error(e);
+    return;
+  }
+
+  function render() {
+    for (let i = 0; i < TOTAL; i++) {
+      const v = wasm.read_byte(i);
+      const el = document.getElementById('cell' + i);
+      el.textContent = v ? v.toString(16).padStart(2, '0') : '';
+      el.classList.remove('overflow');
+      if (i >= BUF_SIZE && v !== 0) el.classList.add('overflow');
+    }
+  }
+  render();
+
+  document.getElementById('vizwrite').addEventListener('click', async () => {
+    const input = document.getElementById('vizinput').value;
+    if (!input) return;
+    wasm.reset_region();
+    render();
+    for (let i = 0; i < input.length && i < TOTAL; i++) {
+      wasm.write_byte(i, input.charCodeAt(i));
+      render();
+      await new Promise(r => setTimeout(r, 60));
+    }
+    if (input.length > BUF_SIZE) {
+      msgEl.textContent = `Wrote ${input.length} bytes into a 16-byte buffer — ${input.length - BUF_SIZE} byte(s) landed in the adjacent region. This is the same mechanism as the strcpy()/gets() overflows above.`;
+    } else {
+      msgEl.textContent = `Wrote ${input.length} bytes — stayed within the 16-byte buffer, adjacent region untouched.`;
+    }
+  });
+
+  document.getElementById('vizreset').addEventListener('click', () => {
+    wasm.reset_region();
+    render();
+    msgEl.textContent = '';
+    document.getElementById('vizinput').value = '';
+  });
+})();
+
+// ---- Quiz ----
+(() => {
+  const questions = [
+    { q: "Why can't gets() be used safely?", opts: ["It's slow", "It takes no length argument", "It only works on Linux", "It requires root"], correct: 1 },
+    { q: "What does AddressSanitizer place around allocations?", opts: ["Encryption keys", "Poisoned redzones", "Backup copies", "Checksums"], correct: 1 },
+    { q: "A stack canary detects corruption of what?", opts: ["The heap", "Global variables", "The return address region", "File descriptors"], correct: 2 },
+    { q: "What's the actual bug in the memcpy() level?", opts: ["memcpy() is broken", "An unvalidated, caller-controlled length", "Wrong function name", "Missing semicolon"], correct: 1 },
+    { q: "What does ASLR randomize?", opts: ["Variable names", "Memory layout per run", "CPU clock speed", "File permissions"], correct: 1 },
+    { q: "Why is the array-indexing bug different from the others?", opts: ["It only affects floats", "No bound exists on the index itself, not a string length", "It can't be detected by ASan", "It only happens on Windows"], correct: 1 },
+  ];
+
+  const wrap = document.getElementById('quizwrap');
+  let score = 0, answered = 0;
+
+  questions.forEach((item, qi) => {
+    const card = document.createElement('div');
+    card.className = 'qcard';
+    const p = document.createElement('p');
+    p.className = 'qtext';
+    p.textContent = `${qi + 1}. ${item.q}`;
+    card.appendChild(p);
+
+    item.opts.forEach((opt, oi) => {
+      const btn = document.createElement('button');
+      btn.className = 'qopt';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => {
+        if (btn.dataset.locked) return;
+        card.querySelectorAll('.qopt').forEach(b => b.dataset.locked = '1');
+        if (oi === item.correct) {
+          btn.classList.add('correct');
+          score++;
+        } else {
+          btn.classList.add('wrong');
+          card.children[item.correct + 1].classList.add('correct');
+        }
+        answered++;
+        if (answered === questions.length) {
+          const s = document.createElement('p');
+          s.id = 'quizscore';
+          s.textContent = `Score: ${score} / ${questions.length}`;
+          wrap.appendChild(s);
+        }
+      });
+      card.appendChild(btn);
+    });
+    wrap.appendChild(card);
+  });
+})();
+</script>
+</body>
+</html>

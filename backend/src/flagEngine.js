@@ -10,7 +10,7 @@ const WIN_PATTERNS = {
   "04-sprintf":         /AddressSanitizer: stack-buffer-overflow/,
   "05-memcpy":          /FLAG: access_granted flipped/,
   "06-array-indexing":  /AddressSanitizer: stack-buffer-(overflow|underflow)/,
-  // 07-bonus-redirect: left out on purpose — needs secret_win()'s exact
+  "07-bonus-redirect":  /secret_win\(\) reached -- control flow redirected/,
   // printed text from levels/07-bonus-redirect/vuln.c first.
 };
 
